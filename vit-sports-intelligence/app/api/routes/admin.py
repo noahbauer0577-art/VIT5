@@ -74,12 +74,14 @@ COMPETITIONS = {
 }
 
 
-def _verify_key(api_key: str):
+def _verify_key(api_key: Optional[str] = None):
     auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
     if not auth_enabled:
         return
-    expected = get_env("API_KEY", "dev_api_key_12345")
-    if api_key != expected:
+    if api_key is None:
+        return
+    expected = get_env("API_KEY", "")
+    if not expected or api_key != expected:
         raise HTTPException(status_code=403, detail="Invalid admin key")
 
 
@@ -193,7 +195,7 @@ class ApiKeyUpdate(BaseModel):
 
 
 @router.get("/api-keys")
-async def list_api_keys(api_key: str = Query(...)):
+async def list_api_keys(api_key: Optional[str] = Query(default=None)):
     """
     Return all configurable API keys with masked current values.
     Never returns plaintext secrets.
@@ -214,7 +216,7 @@ async def list_api_keys(api_key: str = Query(...)):
 
 
 @router.post("/api-keys/update")
-async def update_api_keys(body: ApiKeyUpdate, api_key: str = Query(...)):
+async def update_api_keys(body: ApiKeyUpdate, api_key: Optional[str] = Query(default=None)):
     """
     Update one or more API keys. Changes take effect immediately
     (os.environ) and are persisted to .env for restart survival.
@@ -254,7 +256,7 @@ async def update_api_keys(body: ApiKeyUpdate, api_key: str = Query(...)):
 # ======================================================================
 
 @router.get("/models/status")
-async def get_models_status(api_key: str = Query(...)):
+async def get_models_status(api_key: Optional[str] = Query(default=None)):
     """
     Return per-model status, weight, and error message.
     Powers the Model Status Dashboard in the admin panel.
@@ -277,7 +279,7 @@ class ReloadRequest(BaseModel):
 
 
 @router.post("/models/reload")
-async def reload_models(body: ReloadRequest, api_key: str = Query(...)):
+async def reload_models(body: ReloadRequest, api_key: Optional[str] = Query(default=None)):
     """
     Reload all models or a single model by key.
     One-click fix for failed models.
@@ -305,7 +307,7 @@ async def reload_models(body: ReloadRequest, api_key: str = Query(...)):
 # ======================================================================
 
 @router.get("/data-sources/status")
-async def data_sources_status(api_key: str = Query(...)):
+async def data_sources_status(api_key: Optional[str] = Query(default=None)):
     """
     Check connectivity to Football-Data.org and The Odds API.
     Shown as live/down/no-key badges in the admin panel.
@@ -376,7 +378,7 @@ class ManualMatchRequest(BaseModel):
 
 
 @router.post("/matches/manual")
-async def add_manual_match(body: ManualMatchRequest, api_key: str = Query(...)):
+async def add_manual_match(body: ManualMatchRequest, api_key: Optional[str] = Query(default=None)):
     """
     Add a single fixture manually and run a prediction immediately.
     Used when the Football-Data API is down.
@@ -427,7 +429,7 @@ async def add_manual_match(body: ManualMatchRequest, api_key: str = Query(...)):
 
 @router.post("/upload/csv")
 async def upload_csv_fixtures(
-    api_key: str = Query(...),
+    api_key: Optional[str] = Query(default=None),
     file:    UploadFile = File(...),
 ):
     """
@@ -530,7 +532,7 @@ DATA_DIR   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."
 
 @router.post("/upload/models")
 async def upload_model_weights(
-    api_key: str = Query(...),
+    api_key: Optional[str] = Query(default=None),
     file: UploadFile = File(...),
 ):
     """
@@ -611,7 +613,7 @@ async def upload_model_weights(
 
 @router.get("/accumulator/candidates")
 async def get_accumulator_candidates(
-    api_key:         str   = Query(...),
+    api_key: Optional[str] = Query(default=None),
     min_confidence:  float = Query(default=0.60),
     min_edge:        float = Query(default=0.01),
     count:           int   = Query(default=15, le=30),
@@ -716,7 +718,7 @@ def _correlation_penalty(legs: List[dict]) -> float:
 
 
 @router.post("/accumulator/generate")
-async def generate_accumulators(body: AccumulatorRequest, api_key: str = Query(...)):
+async def generate_accumulators(body: AccumulatorRequest, api_key: Optional[str] = Query(default=None)):
     """
     Generate top-N accumulators from the provided candidates.
 
@@ -807,7 +809,7 @@ class SendAccumulatorRequest(BaseModel):
 
 
 @router.post("/accumulator/send")
-async def send_accumulator_to_telegram(body: SendAccumulatorRequest, api_key: str = Query(...)):
+async def send_accumulator_to_telegram(body: SendAccumulatorRequest, api_key: Optional[str] = Query(default=None)):
     """
     Push a single accumulator to Telegram.
     """
@@ -974,7 +976,7 @@ async def _fetch_fixtures(count: int, target_date: Optional[str] = None) -> list
 
 
 @router.get("/fixtures")
-async def get_fixtures(api_key: str = Query(...), count: int = Query(default=10, le=25)):
+async def get_fixtures(api_key: Optional[str] = Query(default=None), count: int = Query(default=10, le=25)):
     _verify_key(api_key)
     fixtures = await _fetch_fixtures(count)
     return {"fixtures": fixtures, "total": len(fixtures)}
@@ -982,7 +984,7 @@ async def get_fixtures(api_key: str = Query(...), count: int = Query(default=10,
 
 @router.get("/fixtures/by-date")
 async def get_fixtures_by_date(
-    api_key: str = Query(...),
+    api_key: Optional[str] = Query(default=None),
     date: str = Query(..., description="Target date in YYYY-MM-DD format"),
     count: int = Query(default=25, le=50),
 ):
@@ -997,7 +999,7 @@ async def get_fixtures_by_date(
 
 
 @router.get("/bankroll")
-async def get_bankroll(api_key: str = Query(...)):
+async def get_bankroll(api_key: Optional[str] = Query(default=None)):
     """
     Return the current bankroll state: balance, P&L, ROI, win-rate, drawdown.
     Updated automatically after every settled prediction.
@@ -1017,7 +1019,7 @@ async def get_bankroll(api_key: str = Query(...)):
 
 @router.get("/decision-log")
 async def get_decision_log(
-    api_key: str = Query(...),
+    api_key: Optional[str] = Query(default=None),
     limit: int = Query(default=50, le=200),
 ):
     """Return the last N logged prediction decisions with full context."""
@@ -1035,7 +1037,7 @@ async def get_decision_log(
 
 @router.post("/settle-results")
 async def settle_past_results(
-    api_key: str = Query(...),
+    api_key: Optional[str] = Query(default=None),
     days_back: int = Query(default=2, ge=1, le=7),
 ):
     """
@@ -1053,7 +1055,7 @@ async def settle_past_results(
 
 
 @router.get("/fixtures/live")
-async def get_live_fixtures(api_key: str = Query(...)):
+async def get_live_fixtures(api_key: Optional[str] = Query(default=None)):
     """
     Return all currently IN_PLAY matches from Football-Data.org.
     Used by the dashboard Live Now section.
@@ -1069,7 +1071,7 @@ async def get_live_fixtures(api_key: str = Query(...)):
 
 @router.get("/stream-predictions")
 async def stream_predictions(
-    api_key:     str  = Query(...),
+    api_key: Optional[str] = Query(default=None),
     count:       int  = Query(default=10, le=20),
     force_alert: bool = Query(default=True),
 ):

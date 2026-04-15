@@ -350,22 +350,41 @@ export default function AdminPanel({ apiKey }) {
   }
 
   // ── Streaming predictions ─────────────────────────────────────────
-  function startStream() {
+  async function startStream() {
     esRef.current?.close()
     setStatus('running'); setLog([]); setPreds([]); setProgress({ current: 0, total: 0 }); setStreamErr('')
-    const url = `/admin/stream-predictions?api_key=${encodeURIComponent(key)}&count=${count}&force_alert=true`
-    const es  = new EventSource(url)
-    esRef.current = es
+    const controller = new AbortController()
+    esRef.current = { close: () => controller.abort() }
 
-    es.onmessage = (e) => {
-      const d = JSON.parse(e.data)
-      if (d.type === 'status')     setLog(l => [...l, d.message])
-      if (d.type === 'progress')   setProgress({ current: d.current, total: d.total })
-      if (d.type === 'prediction') setPreds(p => [...p, d])
-      if (d.type === 'error')      setLog(l => [...l, `⚠ ${d.fixture ? d.fixture + ': ' : ''}${d.message}`])
-      if (d.type === 'done')       { setStatus('done'); es.close() }
+    try {
+      const res = await fetch('/admin/stream-predictions?count=' + count + '&force_alert=true', {
+        headers: key ? { 'x-api-key': key } : {},
+        signal: controller.signal,
+      })
+      if (!res.ok || !res.body) throw new Error(await res.text() || 'Stream failed')
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const chunks = buffer.split('\n\n')
+        buffer = chunks.pop() || ''
+        for (const chunk of chunks) {
+          const line = chunk.split('\n').find(l => l.startsWith('data: '))
+          if (!line) continue
+          const d = JSON.parse(line.slice(6))
+          if (d.type === 'status')     setLog(l => [...l, d.message])
+          if (d.type === 'progress')   setProgress({ current: d.current, total: d.total })
+          if (d.type === 'prediction') setPreds(p => [...p, d])
+          if (d.type === 'error')      setLog(l => [...l, '⚠ ' + (d.fixture ? d.fixture + ': ' : '') + d.message])
+          if (d.type === 'done')       { setStatus('done'); controller.abort(); return }
+        }
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') { setStatus('error'); setStreamErr(e.message || 'Stream disconnected.') }
     }
-    es.onerror = () => { setStatus('error'); setStreamErr('Stream disconnected.'); es.close() }
   }
 
   function stopStream() { esRef.current?.close(); setStatus('idle') }

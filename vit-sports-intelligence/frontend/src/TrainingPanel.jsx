@@ -2,7 +2,7 @@
 // VIT Sports Intelligence — v3.0.0 Beast Mode Training Panel
 
 import { useEffect, useRef, useState } from 'react'
-import { API_KEY } from './api'
+import { API_KEY, getApiKey } from './api'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -20,7 +20,7 @@ const pill  = c => ({ display:'inline-block', padding:'2px 10px', borderRadius:9
   color:      c==='green'?'#15803d':c==='red'?'#b91c1c':c==='yellow'?'#92400e':c==='blue'?'#1d4ed8':c==='purple'?'#7c3aed':c==='orange'?'#c2410c':'#64748b' })
 
 function apiFetch(path, opts={}) {
-  return fetch(`${API_BASE}${path}`, { headers:{'Content-Type':'application/json','x-api-key':API_KEY}, ...opts })
+  return fetch(`${API_BASE}${path}`, { headers:{'Content-Type':'application/json', ...(getApiKey() ? {'x-api-key':getApiKey()} : {})}, ...opts })
     .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t || r.statusText) }); return r.json() })
 }
 
@@ -61,7 +61,7 @@ function SimulationPanel({ apiKey }) {
 
   async function loadJobs() {
     try {
-      const r = await apiFetch(`/training/simulate/jobs?api_key=${encodeURIComponent(apiKey)}`)
+      const r = await apiFetch(`/training/simulate/jobs`)
       setJobs(r.jobs || [])
       setDataset(r.sim_dataset)
     } catch(e) { console.error(e) }
@@ -70,7 +70,7 @@ function SimulationPanel({ apiKey }) {
   async function startSim() {
     setRunning(true); setErr(''); setSimJob(null)
     try {
-      const r = await apiFetch(`/training/simulate?api_key=${encodeURIComponent(apiKey)}`, {
+      const r = await apiFetch(`/training/simulate`, {
         method:'POST',
         body: JSON.stringify({
           preset,
@@ -88,7 +88,7 @@ function SimulationPanel({ apiKey }) {
 
   async function pollSim(jid) {
     try {
-      const r = await apiFetch(`/training/simulate/status/${jid}?api_key=${encodeURIComponent(apiKey)}`)
+      const r = await apiFetch(`/training/simulate/status/${jid}`)
       setSimJob(r)
       if (r.status === 'completed' || r.status === 'failed') {
         clearInterval(pollRef.current)
@@ -229,7 +229,7 @@ function BootstrapPanel({ apiKey, onJobStarted }) {
 
   async function loadDataStats() {
     try {
-      const r = await apiFetch(`/training/dataset/stats?api_key=${encodeURIComponent(apiKey)}`)
+      const r = await apiFetch(`/training/dataset/stats`)
       setDataStats(r)
     } catch(e) {}
   }
@@ -237,7 +237,7 @@ function BootstrapPanel({ apiKey, onJobStarted }) {
   async function startBootstrap() {
     setRunning(true); setErr(''); setJobId(null)
     try {
-      const r = await apiFetch(`/training/bootstrap?api_key=${encodeURIComponent(apiKey)}`, {
+      const r = await apiFetch(`/training/bootstrap`, {
         method:'POST',
         body: JSON.stringify({ max_matches: maxMatches, use_simulated: useSim, use_historical: useHist })
       })
@@ -318,7 +318,7 @@ function SelfPlayPanel({ apiKey, onJobStarted }) {
   async function startSelfPlay() {
     setRunning(true); setErr(''); setResult(null)
     try {
-      const r = await apiFetch(`/training/self-play?api_key=${encodeURIComponent(apiKey)}`, {
+      const r = await apiFetch(`/training/self-play`, {
         method:'POST',
         body: JSON.stringify({ sim_matches: episodes })
       })
@@ -329,7 +329,7 @@ function SelfPlayPanel({ apiKey, onJobStarted }) {
 
   async function pollJob(jid) {
     try {
-      const r = await apiFetch(`/training/status/${jid}?api_key=${encodeURIComponent(apiKey)}`)
+      const r = await apiFetch(`/training/status/${jid}`)
       if (r.status === 'completed' || r.status === 'failed') {
         clearInterval(pollRef.current)
         setResult(r.summary)
@@ -393,7 +393,7 @@ function EdgeMemoryPanel({ apiKey }) {
   async function load() {
     setLoading(true); setErr('')
     try {
-      const r = await apiFetch(`/training/edge-memory?api_key=${encodeURIComponent(apiKey)}&min_sample=${minSample}`)
+      const r = await apiFetch(`/training/edge-memory?min_sample=${minSample}`)
       setPatterns(r.patterns || [])
       setSummary(r.summary)
     } catch(e) { setErr(e.message) }
@@ -403,7 +403,7 @@ function EdgeMemoryPanel({ apiKey }) {
   async function applyDecay() {
     setDecaying(true)
     try {
-      await apiFetch(`/training/edge-memory/decay?api_key=${encodeURIComponent(apiKey)}&days=1`, { method:'POST' })
+      await apiFetch(`/training/edge-memory/decay?days=1`, { method:'POST' })
       await load()
     } catch(e) { setErr(e.message) }
     finally { setDecaying(false) }
@@ -570,21 +570,21 @@ export default function TrainingPanel({ apiKey }) {
 
   async function loadModelsInfo() {
     setModelsInfoLoading(true)
-    try { const r = await apiFetch(`/training/models/info?api_key=${encodeURIComponent(key)}`); setModelsInfo(r) }
+    try { const r = await apiFetch(`/training/models/info`); setModelsInfo(r) }
     catch(e) { console.error('modelsInfo:', e) }
     finally { setModelsInfoLoading(false) }
   }
 
   async function loadJobs() {
     setJobsL(true)
-    try { const r = await apiFetch(`/training/jobs?api_key=${encodeURIComponent(key)}`); setJobs(r.jobs || []) }
+    try { const r = await apiFetch(`/training/jobs`); setJobs(r.jobs || []) }
     catch(e) { console.error(e) } finally { setJobsL(false) }
   }
 
   async function startTraining() {
     setStarting(true); setStartErr(''); setEvents([]); setModelResults([]); setProgress({current:0,total:0})
     try {
-      const r = await apiFetch(`/training/start?api_key=${encodeURIComponent(key)}`, { method:'POST', body:JSON.stringify(config) })
+      const r = await apiFetch(`/training/start`, { method:'POST', body:JSON.stringify(config) })
       setJobId(r.job_id); setJobStatus('queued')
       streamProgress(r.job_id)
       await loadJobs()
@@ -593,7 +593,7 @@ export default function TrainingPanel({ apiKey }) {
 
   function streamProgress(jid) {
     esRef.current?.close()
-    const es = new EventSource(`${API_BASE}/training/progress/${jid}?api_key=${encodeURIComponent(key)}`)
+    const es = new EventSource(`${API_BASE}/training/progress/${jid}`)
     esRef.current = es
     es.onmessage = (e) => {
       const d = JSON.parse(e.data)
@@ -610,14 +610,14 @@ export default function TrainingPanel({ apiKey }) {
   async function compare() {
     if (!cmpA || !cmpB) { setCmpErr('Select both versions'); return }
     setCmpL(true); setCmpErr(''); setComparison(null)
-    try { setComparison(await apiFetch(`/training/compare?job_id_a=${cmpA}&job_id_b=${cmpB}&api_key=${encodeURIComponent(key)}`)) }
+    try { setComparison(await apiFetch(`/training/compare?job_id_a=${cmpA}&job_id_b=${cmpB}`)) }
     catch(e) { setCmpErr(e.message) } finally { setCmpL(false) }
   }
 
   async function promote(jid) {
     setPromoting(true); setPromoteMsg('')
     try {
-      await apiFetch(`/training/promote?api_key=${encodeURIComponent(key)}`, { method:'POST', body:JSON.stringify({ job_id:jid, reason:'Manually promoted from UI' }) })
+      await apiFetch(`/training/promote`, { method:'POST', body:JSON.stringify({ job_id:jid, reason:'Manually promoted from UI' }) })
       setPromoteMsg(`✅ Version ${jid.slice(0,8)} promoted to production`)
       await loadJobs()
     } catch(e) { setPromoteMsg(`❌ ${e.message}`) }

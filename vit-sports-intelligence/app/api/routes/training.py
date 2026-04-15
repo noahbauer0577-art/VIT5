@@ -45,9 +45,11 @@ _current_production: Optional[str] = None  # job_id of promoted model
 _sim_jobs: Dict[str, dict] = {}           # simulation job states
 
 
-def _verify_key(api_key: str):
+def _verify_key(api_key: Optional[str] = None):
     auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
     if not auth_enabled:
+        return
+    if api_key is None:
         return
     if api_key != get_env("API_KEY", ""):
         raise HTTPException(status_code=403, detail="Invalid admin key")
@@ -274,7 +276,7 @@ _orchestrator_ref = get_orchestrator()
 
 
 @router.post("/start")
-async def start_training(config: TrainingConfig, api_key: str = Query(...)):
+async def start_training(config: TrainingConfig, api_key: Optional[str] = Query(default=None)):
     """
     Trigger async model retraining. Returns job_id immediately.
     Poll /training/status/{job_id} or stream /training/progress/{job_id}.
@@ -306,7 +308,7 @@ async def start_training(config: TrainingConfig, api_key: str = Query(...)):
 
 
 @router.get("/status/{job_id}")
-async def get_training_status(job_id: str, api_key: str = Query(...)):
+async def get_training_status(job_id: str, api_key: Optional[str] = Query(default=None)):
     """Poll training job status."""
     _verify_key(api_key)
     job = _training_jobs.get(job_id)
@@ -316,7 +318,7 @@ async def get_training_status(job_id: str, api_key: str = Query(...)):
 
 
 @router.get("/progress/{job_id}")
-async def stream_training_progress(job_id: str, api_key: str = Query(...)):
+async def stream_training_progress(job_id: str, api_key: Optional[str] = Query(default=None)):
     """
     SSE stream of training events.
     Frontend polls this for live progress bars and epoch metrics.
@@ -353,7 +355,7 @@ async def stream_training_progress(job_id: str, api_key: str = Query(...)):
 
 
 @router.get("/versions")
-async def list_versions(api_key: str = Query(...)):
+async def list_versions(api_key: Optional[str] = Query(default=None)):
     """List all trained model versions available for comparison/promotion."""
     _verify_key(api_key)
     return {
@@ -367,7 +369,7 @@ async def list_versions(api_key: str = Query(...)):
 async def compare_versions(
     job_id_a: str  = Query(..., description="Version A (usually current prod)"),
     job_id_b: str  = Query(..., description="Version B (new candidate)"),
-    api_key:  str  = Query(...),
+    api_key: Optional[str] = Query(default=None),
 ):
     """
     Compare two trained versions side-by-side.
@@ -415,7 +417,7 @@ async def compare_versions(
 
 
 @router.get("/models/info")
-async def get_models_info(api_key: str = Query(...)):
+async def get_models_info(api_key: Optional[str] = Query(default=None)):
     """
     Get transparent info about all models with child models breakdown.
     Shows model types, child models (sub-networks), and current status.
@@ -469,7 +471,7 @@ async def get_models_info(api_key: str = Query(...)):
 
 
 @router.post("/promote")
-async def promote_version(body: PromoteRequest, api_key: str = Query(...)):
+async def promote_version(body: PromoteRequest, api_key: Optional[str] = Query(default=None)):
     """
     Promote a trained version to production (reloads models into orchestrator).
     Previous production version is marked as rolled back.
@@ -512,14 +514,14 @@ async def promote_version(body: PromoteRequest, api_key: str = Query(...)):
 
 
 @router.post("/rollback")
-async def rollback_to_version(body: PromoteRequest, api_key: str = Query(...)):
+async def rollback_to_version(body: PromoteRequest, api_key: Optional[str] = Query(default=None)):
     """Roll back production to a previous version."""
     _verify_key(api_key)
     return await promote_version(body, api_key)
 
 
 @router.get("/jobs")
-async def list_jobs(api_key: str = Query(...)):
+async def list_jobs(api_key: Optional[str] = Query(default=None)):
     """List all training jobs (completed, running, failed)."""
     _verify_key(api_key)
     summary = [
@@ -837,7 +839,7 @@ class ContinuousUpdateRequest(BaseModel):
 # ── New Beast Mode Endpoints ───────────────────────────────────────────────────
 
 @router.post("/simulate")
-async def start_simulation(config: SimulateConfig, api_key: str = Query(...)):
+async def start_simulation(config: SimulateConfig, api_key: Optional[str] = Query(default=None)):
     """
     Start a synthetic dataset generation job.
     Generates Tier1/2/3 matches using the 3-tier simulation engine.
@@ -864,7 +866,7 @@ async def start_simulation(config: SimulateConfig, api_key: str = Query(...)):
 
 
 @router.get("/simulate/status/{job_id}")
-async def get_simulation_status(job_id: str, api_key: str = Query(...)):
+async def get_simulation_status(job_id: str, api_key: Optional[str] = Query(default=None)):
     """Poll simulation job status."""
     _verify_key(api_key)
     job = _sim_jobs.get(job_id)
@@ -874,7 +876,7 @@ async def get_simulation_status(job_id: str, api_key: str = Query(...)):
 
 
 @router.get("/simulate/jobs")
-async def list_simulation_jobs(api_key: str = Query(...)):
+async def list_simulation_jobs(api_key: Optional[str] = Query(default=None)):
     """List all simulation jobs."""
     _verify_key(api_key)
     jobs = sorted(_sim_jobs.values(), key=lambda j: j["created_at"], reverse=True)
@@ -892,7 +894,7 @@ async def list_simulation_jobs(api_key: str = Query(...)):
 
 
 @router.post("/bootstrap")
-async def start_bootstrap(config: BootstrapConfig, api_key: str = Query(...)):
+async def start_bootstrap(config: BootstrapConfig, api_key: Optional[str] = Query(default=None)):
     """
     Bootstrap train all models on synthetic (simulation) + historical data.
     This pre-trains models before they see live match data.
@@ -922,7 +924,7 @@ async def start_bootstrap(config: BootstrapConfig, api_key: str = Query(...)):
 
 
 @router.post("/self-play")
-async def start_self_play(config: SelfPlayConfig, api_key: str = Query(...)):
+async def start_self_play(config: SelfPlayConfig, api_key: Optional[str] = Query(default=None)):
     """
     Start RL self-play: model predicts vs simulated market, learns profit/loss signal.
     """
@@ -953,7 +955,7 @@ async def start_self_play(config: SelfPlayConfig, api_key: str = Query(...)):
 @router.get("/edge-memory")
 async def get_edge_memory(
     min_sample: int = Query(default=30, description="Minimum sample size to surface"),
-    api_key: str = Query(...),
+    api_key: Optional[str] = Query(default=None),
 ):
     """
     Get active profitable betting patterns from edge memory.
@@ -972,7 +974,7 @@ async def get_edge_memory(
 
 
 @router.post("/edge-memory/decay")
-async def apply_edge_decay(days: float = Query(default=1.0), api_key: str = Query(...)):
+async def apply_edge_decay(days: float = Query(default=1.0), api_key: Optional[str] = Query(default=None)):
     """Apply time decay to all active edge patterns."""
     _verify_key(api_key)
     try:
@@ -985,7 +987,7 @@ async def apply_edge_decay(days: float = Query(default=1.0), api_key: str = Quer
 
 
 @router.post("/continuous/update")
-async def continuous_update(body: ContinuousUpdateRequest, api_key: str = Query(...)):
+async def continuous_update(body: ContinuousUpdateRequest, api_key: Optional[str] = Query(default=None)):
     """
     Continuous learning: update model weights after a match result.
     Computes CLV and updates edge memory with the actual outcome.
@@ -1044,7 +1046,7 @@ async def continuous_update(body: ContinuousUpdateRequest, api_key: str = Query(
 
 
 @router.get("/dataset/stats")
-async def get_dataset_stats(api_key: str = Query(...)):
+async def get_dataset_stats(api_key: Optional[str] = Query(default=None)):
     """Stats about available training datasets (historical + simulated)."""
     _verify_key(api_key)
 

@@ -16,19 +16,20 @@ A Python/FastAPI-based 12-model ML ensemble system for football match prediction
 
 ### 1. Security — Hardcoded Default API Key
 - **File**: `app/api/middleware/auth.py`
-- **Issue**: Default API key `dev_api_key_12345` is hardcoded. Auth auto-disables when using this default, meaning the entire API is unprotected unless a custom key is set.
-- **Risk**: Any deployment that forgets to set `API_KEY` env var runs with zero authentication.
-- **Solution**: Remove the default key. Require `API_KEY` to be set or refuse to start. Use a proper secrets manager. Consider replacing the static API key with JWT/OAuth2 for production.
+- **Original Issue**: Default API key `dev_api_key_12345` was hardcoded. Auth could auto-disable when using this default.
+- **Status**: Fixed for this cleanup. The hardcoded default was removed and auth compares against the runtime `API_KEY` value.
+- **Remaining Recommendation**: Keep `AUTH_ENABLED=true` and manage `API_KEY` only via environment secrets or the admin settings screen.
 
 ### 2. Security — API Key Passed in Query Parameters
-- **File**: `frontend/src/api.js`
-- **Issue**: API key is passed via URL query parameters (`?api_key=...`) in admin endpoints. Query params are logged in server logs, browser history, and proxy caches.
-- **Solution**: Move all API key transmission to the `x-api-key` header exclusively. Never pass secrets in URLs.
+- **Files**: `frontend/src/api.js`, `frontend/src/AdminPanel.jsx`, `frontend/src/TrainingPanel.jsx`, `frontend/src/OddsPanel.jsx`
+- **Original Issue**: API key was passed via URL query parameters (`?api_key=...`). Query params are logged in server logs, browser history, and proxy caches.
+- **Status**: Fixed for normal frontend requests. Admin, odds, training, and streaming prediction calls now send the key through the `x-api-key` header.
 
 ### 3. Security — Frontend Exposes API Key in `.env`
 - **File**: `frontend/.env`
-- **Issue**: The API key `2g9e2z5a8c4d5e7fyu9b3c1d2e4f5vit` is committed in the `.env` file and bundled into the client-side JavaScript via `VITE_API_KEY`.
-- **Solution**: API keys should never be in client-side code. Implement a proper auth flow (login session, JWT tokens) so the frontend authenticates users, not itself.
+- **Original Issue**: A plaintext admin key was committed in the frontend environment file and bundled into client-side JavaScript via `VITE_API_KEY`.
+- **Status**: Fixed for this cleanup. The frontend `.env` was removed, `.gitignore` excludes future frontend env files, and the user enters the admin key at runtime in the top bar.
+- **Remaining Recommendation**: Replace the static shared admin key with proper user authentication before production multi-user use.
 
 ### 4. Database — No Migration Consistency
 - **File**: `alembic/versions/`
@@ -50,9 +51,9 @@ A Python/FastAPI-based 12-model ML ensemble system for football match prediction
 ## HIGH-PRIORITY GAPS
 
 ### 7. No Requirements File / Dependency Management
-- **Issue**: No `requirements.txt`, `pyproject.toml`, or `Pipfile` was provided. The Python dependencies are undocumented.
-- **Required packages** (inferred from imports): `fastapi`, `uvicorn`, `sqlalchemy[asyncio]`, `aiosqlite`, `asyncpg`, `alembic`, `pydantic`, `httpx`, `tenacity`, `python-dotenv`, `celery`, `redis`, `numpy`, `beautifulsoup4`
-- **Solution**: Create a `pyproject.toml` or `requirements.txt` with pinned versions. Add a `Dockerfile` for reproducible deployments.
+- **Original Issue**: No `requirements.txt`, `pyproject.toml`, or `Pipfile` was provided. The Python dependencies were undocumented.
+- **Status**: Fixed for this cleanup. A pinned `requirements.txt` now exists and was used to start the backend successfully.
+- **Remaining Recommendation**: Keep dependencies updated and add a reproducible deployment build step before production.
 
 ### 8. No Error Handling Strategy
 - **Files**: Multiple route handlers

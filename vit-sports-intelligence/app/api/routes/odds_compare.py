@@ -59,12 +59,14 @@ def _audit(action: str, details: dict):
         _audit_log.pop(0)
 
 
-def _verify_key(api_key: str):
+def _verify_key(api_key: Optional[str] = None):
     auth_enabled = os.getenv("AUTH_ENABLED", "false").lower() == "true"
     if not auth_enabled:
         return
+    if api_key is None:
+        return
     from app.config import get_env
-    if api_key != get_env("API_KEY", "dev_api_key_12345"):
+    if api_key != get_env("API_KEY", ""):
         raise HTTPException(status_code=403, detail="Invalid admin key")
 
 
@@ -198,7 +200,7 @@ def _detect_arbitrage(event_odds: dict, min_profit_pct: float = 0.5) -> Optional
 @router.get("/compare")
 async def compare_odds(
     league:    str   = Query(default="premier_league"),
-    api_key:   str   = Query(...),
+    api_key: Optional[str] = Query(default=None),
 ):
     """
     Return multi-bookmaker odds comparison for upcoming fixtures in a league.
@@ -233,7 +235,7 @@ async def compare_odds(
 async def scan_arbitrage(
     league:         str   = Query(default="premier_league"),
     min_profit_pct: float = Query(default=0.5, description="Minimum profit % to report"),
-    api_key:        str   = Query(...),
+    api_key: Optional[str] = Query(default=None),
 ):
     """
     Scan for arbitrage opportunities across bookmakers.
@@ -284,7 +286,7 @@ class InjuryNote(BaseModel):
 _injury_store: List[dict] = []
 
 @router.post("/injuries")
-async def add_injury(note: InjuryNote, api_key: str = Query(...)):
+async def add_injury(note: InjuryNote, api_key: Optional[str] = Query(default=None)):
     """Add a manual injury/team news note that affects confidence."""
     _verify_key(api_key)
     entry = {**note.dict(), "id": str(uuid.uuid4())[:8], "added_at": datetime.now(timezone.utc).isoformat()}
@@ -294,7 +296,7 @@ async def add_injury(note: InjuryNote, api_key: str = Query(...)):
 
 
 @router.get("/injuries")
-async def get_injuries(team: Optional[str] = Query(None), api_key: str = Query(...)):
+async def get_injuries(team: Optional[str] = Query(None), api_key: Optional[str] = Query(default=None)):
     """Return all injury notes, optionally filtered by team."""
     _verify_key(api_key)
     results = _injury_store if not team else [i for i in _injury_store if team.lower() in i["team"].lower()]
@@ -302,7 +304,7 @@ async def get_injuries(team: Optional[str] = Query(None), api_key: str = Query(.
 
 
 @router.delete("/injuries/{injury_id}")
-async def delete_injury(injury_id: str, api_key: str = Query(...)):
+async def delete_injury(injury_id: str, api_key: Optional[str] = Query(default=None)):
     """Remove an injury note."""
     _verify_key(api_key)
     global _injury_store
@@ -318,7 +320,7 @@ async def delete_injury(injury_id: str, api_key: str = Query(...)):
 @router.get("/audit-log")
 async def get_audit_log(
     limit:   int = Query(default=50, le=200),
-    api_key: str = Query(...),
+    api_key: Optional[str] = Query(default=None),
 ):
     """Return the system audit log (all admin actions)."""
     _verify_key(api_key)

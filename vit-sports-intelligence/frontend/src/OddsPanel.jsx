@@ -2,7 +2,7 @@
 // VIT Sports Intelligence — v3.0.0  Odds & Arbitrage
 
 import { useState } from 'react'
-import { API_KEY } from './api'
+import { API_KEY, getApiKey } from './api'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -18,7 +18,7 @@ const pill  = c => ({ display:'inline-block', padding:'2px 10px', borderRadius:9
   color:c==='green'?'#15803d':c==='red'?'#b91c1c':c==='yellow'?'#92400e':c==='blue'?'#1d4ed8':'#64748b' })
 
 function apiFetch(path, opts={}) {
-  return fetch(`${API_BASE}${path}`, { headers:{'Content-Type':'application/json','x-api-key':API_KEY}, ...opts })
+  return fetch(`${API_BASE}${path}`, { headers:{'Content-Type':'application/json', ...(getApiKey() ? {'x-api-key':getApiKey()} : {})}, ...opts })
     .then(r => { if(!r.ok) return r.text().then(t=>{throw new Error(t||r.statusText)}); return r.json() })
 }
 
@@ -57,7 +57,7 @@ function OddsCompare({ apiKey }) {
 
   async function load() {
     setLoad(true); setErr(''); setData(null)
-    try { setData(await apiFetch(`/odds/compare?league=${league}&api_key=${encodeURIComponent(key)}`)) }
+    try { setData(await apiFetch(`/odds/compare?league=${league}`)) }
     catch(e) { setErr(e.message) } finally { setLoad(false) }
   }
 
@@ -145,7 +145,7 @@ function ArbitrageScanner({ apiKey }) {
 
   async function scan() {
     setLoad(true); setErr(''); setData(null)
-    try { setData(await apiFetch(`/odds/arbitrage?league=${league}&min_profit_pct=${minProfit}&api_key=${encodeURIComponent(key)}`)) }
+    try { setData(await apiFetch(`/odds/arbitrage?league=${league}&min_profit_pct=${minProfit}`)) }
     catch(e) { setErr(e.message) } finally { setLoad(false) }
   }
 
@@ -223,19 +223,19 @@ function InjuryNotes({ apiKey }) {
 
   async function loadNotes() {
     setLoad(true)
-    try { const r = await apiFetch(`/odds/injuries?api_key=${encodeURIComponent(key)}`); setNotes(r.injuries||[]) }
+    try { const r = await apiFetch(`/odds/injuries`); setNotes(r.injuries||[]) }
     catch(e) { console.error(e) } finally { setLoad(false) }
   }
 
   async function addNote() {
     if (!form.team || !form.player) return
     setSaving(true)
-    try { await apiFetch(`/odds/injuries?api_key=${encodeURIComponent(key)}`, { method:'POST', body:JSON.stringify(form) }); setForm({team:'',player:'',status:'out',note:''}); await loadNotes() }
+    try { await apiFetch(`/odds/injuries`, { method:'POST', body:JSON.stringify(form) }); setForm({team:'',player:'',status:'out',note:''}); await loadNotes() }
     catch(e) { alert(e.message) } finally { setSaving(false) }
   }
 
   async function deleteNote(id) {
-    try { await apiFetch(`/odds/injuries/${id}?api_key=${encodeURIComponent(key)}`, {method:'DELETE'}); await loadNotes() }
+    try { await apiFetch(`/odds/injuries/${id}`, {method:'DELETE'}); await loadNotes() }
     catch(e) { alert(e.message) }
   }
 
@@ -301,7 +301,7 @@ function AuditLog({ apiKey }) {
 
   async function load() {
     setLoad(true)
-    try { const r = await apiFetch(`/odds/audit-log?api_key=${encodeURIComponent(key)}`); setLog(r.log||[]) }
+    try { const r = await apiFetch(`/odds/audit-log`); setLog(r.log||[]) }
     catch(e) { console.error(e) } finally { setLoad(false) }
   }
 

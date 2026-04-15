@@ -2,7 +2,7 @@
 // Professional UI: fixed sidebar (desktop) + drawer sidebar (mobile)
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fetchHealth, fetchHistory, fetchPicks, predictMatch, fetchFixturesByDate, API_KEY } from './api'
+import { fetchHealth, fetchHistory, fetchPicks, predictMatch, fetchFixturesByDate, getApiKey, setApiKey } from './api'
 import AdminPanel       from './AdminPanel'
 import AccumulatorPanel from './AccumulatorPanel'
 import TrainingPanel    from './TrainingPanel'
@@ -123,6 +123,7 @@ export default function App() {
   const [error, setError]          = useState('')
   const [page, setPage]            = useState(0)
   const [matchId, setMatchId]      = useState(null)
+  const [adminKey, setAdminKey]    = useState(getApiKey())
 
   // Dashboard fixture browser
   const [dashFixtures, setDashFixtures]       = useState(null)
@@ -200,7 +201,7 @@ export default function App() {
 
   async function loadDashFixtures(dateStr) {
     setDashFixDate(dateStr); setDashFixLoading(true); setDashFixError(''); setDashFixtures(null)
-    try { setDashFixtures(await fetchFixturesByDate(API_KEY, dateStr)) }
+    try { setDashFixtures(await fetchFixturesByDate(adminKey, dateStr)) }
     catch (e) { setDashFixError(e.message) }
     finally { setDashFixLoading(false) }
   }
@@ -257,6 +258,14 @@ export default function App() {
           <div className="brand-icon">⚽</div>
           <span>VIT Predict</span>
         </div>
+        <input
+          className="topbar-key"
+          type="password"
+          placeholder="Admin key"
+          value={adminKey}
+          onChange={(e) => { setAdminKey(e.target.value); setApiKey(e.target.value) }}
+          aria-label="Admin API key"
+        />
         <div style={{ display:'flex', gap:6 }}>
           <div className={`status-dot ${online ? 'dot-green' : 'dot-red'}`} style={{ width:8, height:8 }} />
         </div>
@@ -659,35 +668,35 @@ export default function App() {
         {/* ════ ACCUMULATORS ═════════════════════════════════════ */}
         {tab === 'accumulator' && (
           <div className="fade-up">
-            <AccumulatorPanel apiKey={API_KEY} />
+            <AccumulatorPanel apiKey={adminKey} />
           </div>
         )}
 
         {/* ════ ANALYTICS ════════════════════════════════════════ */}
         {tab === 'analytics' && (
           <div className="fade-up">
-            <AnalyticsPanel apiKey={API_KEY} />
+            <AnalyticsPanel apiKey={adminKey} />
           </div>
         )}
 
         {/* ════ ODDS ═════════════════════════════════════════════ */}
         {tab === 'odds' && (
           <div className="fade-up">
-            <OddsPanel apiKey={API_KEY} />
+            <OddsPanel apiKey={adminKey} />
           </div>
         )}
 
         {/* ════ TRAINING ═════════════════════════════════════════ */}
         {tab === 'training' && (
           <div className="fade-up">
-            <TrainingPanel apiKey={API_KEY} />
+            <TrainingPanel apiKey={adminKey} />
           </div>
         )}
 
         {/* ════ ADMIN ════════════════════════════════════════════ */}
         {tab === 'admin' && (
           <div className="fade-up">
-            <AdminPanel apiKey={API_KEY} />
+            <AdminPanel apiKey={adminKey} />
           </div>
         )}
 

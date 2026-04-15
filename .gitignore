@@ -47,3 +47,9 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+vit-sports-intelligence/.env
+vit-sports-intelligence/vit.db
+vit-sports-intelligence/frontend/.env
+vit-sports-intelligence/frontend/dist/
+vit-sports-intelligence/frontend/node_modules/
+vit-sports-intelligence/models/*.pkl
