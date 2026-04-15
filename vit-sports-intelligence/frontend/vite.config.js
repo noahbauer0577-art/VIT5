@@ -16,17 +16,54 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       allowedHosts: true,
       proxy: {
-        '/predict': backendUrl,
-        '/history': backendUrl,
-        '/health':  backendUrl,
-        '/fetch':   backendUrl,
-        '/odds':    backendUrl,
-        '/analytics': backendUrl,
-        '/training': backendUrl,
-        '/admin':   backendUrl,
-        '/results': backendUrl,
-        '/system':  backendUrl,
-        '/ai':      backendUrl,
+        '/predict': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/history': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/health': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/fetch': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/odds': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/analytics': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/training': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/admin': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/results': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/system': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/ai': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/test-predict': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
       },
     },
   }

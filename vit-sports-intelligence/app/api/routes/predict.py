@@ -144,10 +144,15 @@ async def predict(
     - Sends Telegram alert for ALL predictions (edge or no edge)
       so the channel always shows match status
     - BetAlert includes model count, all probs, all odds, data source
+    
+    v2.4.0:
+    - Accepts fixture_id to track which specific fixture was predicted
+    - Logs fixture_id for debugging and fixture-prediction mapping
     """
     if orchestrator is None:
         raise HTTPException(status_code=503, detail="Orchestrator not initialized")
 
+    fixture_id = match.fixture_id if match.fixture_id else "unknown"
     idempotency_key = create_idempotency_key(match)
     naive_kickoff = to_naive_utc(match.kickoff_time)
 
@@ -282,7 +287,7 @@ async def predict(
         await db.commit()
 
         logger.info(
-            f"Prediction saved: match={db_match.id}, "
+            f"Prediction saved: fixture_id={fixture_id}, match={db_match.id}, "
             f"side={best_bet.get('best_side')}, "
             f"edge={best_bet.get('edge', 0):.4f}, "
             f"models={models_used}/{models_total}, "

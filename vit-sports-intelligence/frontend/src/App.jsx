@@ -2,7 +2,7 @@
 // Professional UI: fixed sidebar (desktop) + drawer sidebar (mobile)
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fetchHealth, fetchHistory, fetchPicks, predictMatch, fetchFixturesByDate, getApiKey, setApiKey } from './api'
+import { fetchHealth, fetchHistory, fetchPicks, predictMatch, fetchFixturesByDate, fetchFixtureById, getApiKey, setApiKey } from './api'
 import AdminPanel       from './AdminPanel'
 import AccumulatorPanel from './AccumulatorPanel'
 import TrainingPanel    from './TrainingPanel'
@@ -153,7 +153,14 @@ export default function App() {
   useEffect(() => { if (tab === 'picks' && !picks) loadPicks() }, [tab])
 
   async function pollHealth() {
-    try { setHealth(await fetchHealth()) } catch {}
+    try {
+      const data = await fetchHealth()
+      console.log('[Health] Status:', data?.status)
+      setHealth(data)
+    } catch (error) {
+      console.error('[Health] Poll failed:', error.message)
+      setHealth(null)
+    }
   }
 
   async function loadHistory() {
@@ -210,6 +217,7 @@ export default function App() {
     setPredictingIdx(idx); setError(''); setPred(null)
     try {
       const res = await predictMatch({
+        fixture_id:   fix.fixture_id,  // Include unique fixture ID
         home_team:    fix.home_team,
         away_team:    fix.away_team,
         league:       fix.league,
@@ -415,11 +423,12 @@ export default function App() {
                         const leagueLabel = fix.league?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '—'
                         const mo = fix.market_odds || {}
                         const isPredicting = predictingIdx === idx
+                        const isReal = fix.fixture_id && !fix.fixture_id.startsWith('synthetic')
                         return (
                           <div key={idx} style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             gap: 12, padding: '10px 14px', background: '#f8fafc',
-                            border: '1px solid #e2e8f0', borderRadius: 10, flexWrap: 'wrap',
+                            border: `1px solid ${isReal ? '#10b981' : '#fbbf24'}`, borderRadius: 10, flexWrap: 'wrap',
                           }}>
                             <div style={{ flex: 1, minWidth: 160 }}>
                               <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
@@ -428,13 +437,15 @@ export default function App() {
                               <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
                                 {leagueLabel} · {ko}
                                 {mo.home ? <span style={{ marginLeft: 8, color: '#334155' }}>{mo.home.toFixed(2)} / {mo.draw?.toFixed(2)} / {mo.away?.toFixed(2)}</span> : null}
+                                {fix.fixture_id && <span style={{ marginLeft: 8, fontSize: '0.7rem', color: '#94a3b8' }}>ID: {fix.fixture_id.slice(0, 20)}…</span>}
                               </div>
                             </div>
                             <button
                               className="btn btn-primary"
-                              style={{ fontSize: '0.82rem', padding: '6px 16px', whiteSpace: 'nowrap' }}
+                              style={{ fontSize: '0.82rem', padding: '6px 16px', whiteSpace: 'nowrap', background: isReal ? '#0ea5e9' : '#f59e0b' }}
                               onClick={() => predictFixture(fix, idx)}
                               disabled={isPredicting || loading}
+                              title={fix.fixture_id ? `Fixture ID: ${fix.fixture_id}` : 'Synthetic fixture'}
                             >
                               {isPredicting ? '⟳ Running…' : '🔮 Predict'}
                             </button>

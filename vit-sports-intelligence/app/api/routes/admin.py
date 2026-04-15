@@ -884,6 +884,7 @@ async def _fetch_fixtures(count: int, target_date: Optional[str] = None) -> list
                 if r.status_code == 200:
                     for m in r.json().get("matches", []):
                         fixtures.append({
+                            "fixture_id":   str(m.get("id", "")),  # Unique ID from Football-Data API
                             "home_team":    m["homeTeam"]["name"],
                             "away_team":    m["awayTeam"]["name"],
                             "league":       league,
@@ -960,17 +961,53 @@ async def _fetch_fixtures(count: int, target_date: Optional[str] = None) -> list
     if not fixtures:
         logger.warning("No fixtures returned from Football-Data API; using synthetic fixtures fallback.")
         now = datetime.now(timezone.utc)
-        for i, league in enumerate(COMPETITIONS.keys()):
+        
+        # More realistic synthetic team pairings for each league
+        synthetic_teams = {
+            "premier_league": [
+                ("Manchester United", "Liverpool"), ("Arsenal", "Manchester City"),
+                ("Chelsea", "Tottenham"), ("Newcastle", "Brighton"),
+            ],
+            "la_liga": [
+                ("Real Madrid", "Barcelona"), ("Atletico Madrid", "Valencia"),
+                ("Seville", "Real Sociedad"), ("Villarreal", "Getafe"),
+            ],
+            "bundesliga": [
+                ("Bayern Munich", "Borussia Dortmund"), ("RB Leipzig", "Bayer Leverkusen"),
+                ("Schalke", "Hertha Berlin"), ("Hoffenheim", "Eintracht Frankfurt"),
+            ],
+            "serie_a": [
+                ("Inter", "AC Milan"), ("Juventus", "Roma"),
+                ("Napoli", "Lazio"), ("Fiorentina", "Atalanta"),
+            ],
+            "ligue_1": [
+                ("Paris Saint-Germain", "Marseille"), ("Lyon", "Monaco"),
+                ("Lille", "Strasbourg"), ("Rennes", "Lens"),
+            ],
+        }
+        
+        for i, (league, teams_list) in enumerate(synthetic_teams.items()):
             if len(fixtures) >= count:
                 break
-            kickoff = now + timedelta(days=i + 1, hours=12)
-            fixtures.append({
-                "home_team": f"{league.title().replace('_', ' ')} Home",
-                "away_team": f"{league.title().replace('_', ' ')} Away",
-                "league": league,
-                "kickoff_time": kickoff.isoformat().replace("+00:00", "Z"),
-                "market_odds": {"home": 2.30, "draw": 3.30, "away": 3.10},
-            })
+            if league in COMPETITIONS:
+                for j, (home, away) in enumerate(teams_list):
+                    if len(fixtures) >= count:
+                        break
+                    kickoff = now + timedelta(days=i + 1, hours=12 + j)
+                    # Vary odds slightly for realism
+                    odds_variation = 0.1 * (j % 3 - 1)  # -0.1, 0, or 0.1
+                    fixtures.append({
+                        "fixture_id": f"synthetic_{league}_{i}_{j}",
+                        "home_team": home,
+                        "away_team": away,
+                        "league": league,
+                        "kickoff_time": kickoff.isoformat().replace("+00:00", "Z"),
+                        "market_odds": {
+                            "home": round(2.30 + odds_variation, 2),
+                            "draw": 3.30,
+                            "away": round(3.10 - odds_variation, 2)
+                        },
+                    })
 
     return fixtures[:count]
 
@@ -996,6 +1033,30 @@ async def get_fixtures_by_date(
         raise HTTPException(status_code=422, detail="date must be in YYYY-MM-DD format")
     fixtures = await _fetch_fixtures(count, target_date=date)
     return {"date": date, "fixtures": fixtures, "total": len(fixtures)}
+
+
+@router.get("/fixtures/by-id/{fixture_id}")
+async def get_fixture_by_id(
+    fixture_id: str,
+    api_key: Optional[str] = Query(default=None),
+):
+    """Return a specific fixture by its Football-Data API ID or synthetic ID."""
+    _verify_key(api_key)
+    try:
+        # Fetch a large batch and find the matching fixture
+        fixtures = await _fetch_fixtures(100)
+        for fixture in fixtures:
+            if fixture.get("fixture_id") == fixture_id:
+                return {"fixture": fixture, "found": True}
+        
+        # If not found, log and return error
+        logger.warning(f"Fixture ID {fixture_id} not found in current schedule")
+        raise HTTPException(status_code=404, detail=f"Fixture with ID {fixture_id} not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Fixture lookup failed for ID {fixture_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/bankroll")

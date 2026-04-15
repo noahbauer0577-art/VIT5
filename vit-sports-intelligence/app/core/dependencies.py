@@ -17,9 +17,12 @@ def get_orchestrator() -> Optional[ModelOrchestrator]:
     try:
         orch = ModelOrchestrator()
         orch.load_all_models()
+        print(f"✅ Orchestrator initialized: {orch.num_models_ready()} models")
         return orch
     except Exception as e:
-        print(f"⚠️ Orchestrator load failed: {e}")
+        print(f"❌ Orchestrator load failed: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -30,14 +33,18 @@ def get_data_loader() -> Optional[DataLoader]:
         football_api_key = os.getenv("FOOTBALL_DATA_API_KEY", "")
         odds_api_key = os.getenv("ODDS_API_KEY", "")
 
-        return DataLoader(
+        loader = DataLoader(
             api_key=football_api_key,
             odds_api_key=odds_api_key,
             enable_scraping=os.getenv("ENABLE_SCRAPING", "true").lower() == "true",
             enable_odds=os.getenv("ENABLE_ODDS", "true").lower() == "true"
         )
+        print(f"✅ DataLoader initialized (scraping={loader.enable_scraping}, odds={loader.enable_odds})")
+        return loader
     except Exception as e:
-        print(f"⚠️ DataLoader init failed: {e}")
+        print(f"❌ DataLoader init failed: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 

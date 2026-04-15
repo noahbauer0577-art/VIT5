@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.config import get_env, APP_VERSION
 from app.db.database import engine, Base, get_db, _is_sqlite
@@ -226,23 +226,27 @@ async def add_request_id(request: Request, call_next):
 async def health(db: AsyncSession = Depends(get_db)):
     db_status = False
     try:
-        await db.execute(select(1))
+        await db.execute(text("SELECT 1"))
         db_status = True
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ DB health check failed: {e}")
 
     orch = get_orchestrator()
+    models_ready = orch.num_models_ready() if orch else 0
     return HealthResponse(
-        status="ok" if orch and orch.num_models_ready() > 0 else "degraded",
-        models_loaded=orch.num_models_ready() if orch else 0,
+        status="ok" if db_status and models_ready > 0 else "degraded",
+        models_loaded=models_ready,
         db_connected=db_status,
         clv_tracking_enabled=True,
     )
 
 
 @app.get("/health/ml")
-async def ml_health(orchestrator = Depends(get_orchestrator_dep)):
-    status = orchestrator.get_model_status()
+async def ml_health():
+    orch = get_orchestrator()
+    if not orch:
+        return {"status": "degraded", "models_loaded": 0, "models_total": 0, "models": [], "error": "Orchestrator not available"}
+    status = orch.get_model_status()
     return {
         "status": "healthy" if status.get("ready", 0) > 0 else "degraded",
         "models_loaded": status.get("ready", 0),
@@ -274,18 +278,21 @@ async def alerts_health(alerts = Depends(get_telegram_alerts)):
 @app.get("/system/status")
 async def system_status(
     db: AsyncSession = Depends(get_db),
-    orchestrator = Depends(get_orchestrator_dep),
-    loader = Depends(get_data_loader_dep),
     alerts = Depends(get_telegram_alerts),
 ):
     db_connected = False
     try:
-        await db.execute(select(1))
+        await db.execute(text("SELECT 1"))
         db_connected = True
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ System status DB check failed: {e}")
+    
+    orch = get_orchestrator()
+    loader = get_data_loader()
+    if not orch or not loader:
+        return {"status": "degraded", "error": "Services not initialized"}
 
-    status = orchestrator.get_model_status()
+    status = orch.get_model_status()
     return {
         "version": APP_VERSION,
         "status": "operational",

@@ -4,6 +4,7 @@
 //        CSV upload, accumulator candidates/generate/send
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+console.log('[API] Base URL:', API_BASE_URL || '(using relative URLs)')
 export const API_KEY = ''
 export function getApiKey() { return localStorage.getItem('vit_api_key') || '' }
 export function setApiKey(value) { localStorage.setItem('vit_api_key', value || '') }
@@ -19,15 +20,23 @@ function authHeaders(apiKey, extra = {}) {
 }
 
 async function apiFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: defaultHeaders(),
-    ...options,
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text || res.statusText || 'Request failed')
+  const url = `${API_BASE_URL}${path}`
+  try {
+    const res = await fetch(url, {
+      headers: defaultHeaders(),
+      ...options,
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      console.error(`[API] Error at ${url}:`, res.status, text)
+      throw new Error(text || res.statusText || 'Request failed')
+    }
+    const data = await res.json()
+    return data
+  } catch (error) {
+    console.error(`[API] Fetch failed for ${url}:`, error.message)
+    throw error
   }
-  return res.json()
 }
 
 // ── Existing ──────────────────────────────────────────────────────────
@@ -38,6 +47,7 @@ export async function fetchPicks()                { return apiFetch('/history/pi
 export async function clearHistory(apiKey)       { return apiFetch(`/history/clear-all`, { method: 'DELETE', headers: authHeaders(apiKey) }) }
 export async function predictMatch(matchData)     { return apiFetch('/predict', { method: 'POST', body: JSON.stringify(matchData) }) }
 export async function fetchFixturesByDate(apiKey, date, count=25) { return apiFetch(`/admin/fixtures/by-date?date=${encodeURIComponent(date)}&count=${count}`) }
+export async function fetchFixtureById(fixtureId) { return apiFetch(`/admin/fixtures/by-id/${encodeURIComponent(fixtureId)}`) }
 
 // ── v2.2.0 — Model Management ─────────────────────────────────────────
 export async function fetchModelStatus(apiKey) {
