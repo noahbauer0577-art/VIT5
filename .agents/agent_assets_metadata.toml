@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "AiHtdBLOC06VsN0wKz_KE"
+uri = "file://vit-sports-intelligence/GAP_ANALYSIS.md"
+type = "text"
+title = "VIT Sports Intelligence — Gap Analysis & Bug Report"
